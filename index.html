@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>โปรแกรมออกเลขทะเบียนเครื่องผลิตพลังงาน (Google Sheets)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', 'Inter', sans-serif;
+        }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); padding-top: 60px; align-items: center; justify-content: center; }
+        .modal-content { background-color: #1f2937; margin: auto; padding: 20px; border: 1px solid #4b5563; width: 90%; max-width: 600px; border-radius: 0.5rem; text-align: center; color: white; } /* Increased max-width for more fields */
+        .close-button { color: #9ca3af; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: white; text-decoration: none; cursor: pointer; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.2); width: 36px; height: 36px; border-radius: 50%; border-left-color: #38bdf8; animation: spin 1s ease infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        select, input[type="text"], input[type="number"], textarea { color: white; background-color: #374151; }
+        select option { background-color: #374151; color: white; }
+        select option:disabled { color: #9ca3af; }
+        textarea { min-height: 80px; }
+        .checkbox-group label { margin-left: 0.5rem; }
+        #registrationNumbersListContainer { max-height: 200px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #38bdf8 #374151; }
+        #registrationNumbersListContainer::-webkit-scrollbar { width: 8px; }
+        #registrationNumbersListContainer::-webkit-scrollbar-track { background: #374151; border-radius: 10px; }
+        #registrationNumbersListContainer::-webkit-scrollbar-thumb { background-color: #38bdf8; border-radius: 10px; border: 2px solid #374151; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-white min-h-screen flex flex-col items-center justify-center p-4 py-8"> {/* Added py-8 for more vertical space */}
+
+    <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-3xl"> {/* Increased max-width */}
+        <h1 class="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-300">โปรแกรมออกเลขทะเบียน (Google Sheets)</h1>
+
+        <div class="mb-4 text-xs sm:text-sm text-slate-400">
+            <span id="dataSourceNote" class="block text-xs text-amber-400 mt-1">ข้อมูล Serial Number และ Log จัดการผ่าน Google Sheets</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div>
+                <label for="proposer" class="block text-sm font-medium text-slate-300 mb-1">ผู้เสนอ:</label>
+                <input type="text" id="proposer" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="ชื่อผู้เสนอ">
+            </div>
+            <div>
+                <label for="department" class="block text-sm font-medium text-slate-300 mb-1">งาน:</label>
+                <select id="department" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                    <option value="">-- เลือกงาน --</option>
+                    <option value="พพ.">พพ.</option>
+                    <option value="สกพ.">สกพ.</option>
+                    <option value="อื่นๆ">อื่นๆ</option>
+                </select>
+            </div>
+            <div>
+                <label for="province" class="block text-sm font-medium text-slate-300 mb-1">เลือกจังหวัด (สำหรับออกเลข):</label>
+                <select id="province" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                    <option value="">-- เลือกจังหวัด --</option>
+                </select>
+            </div>
+            <div>
+                <label for="tsicId" class="block text-sm font-medium text-slate-300 mb-1">รหัส TSIC ID (3 หลัก):</label>
+                <input type="text" id="tsicId" maxlength="3" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="เช่น 123">
+            </div>
+             <div>
+                <label for="internalCode" class="block text-sm font-medium text-slate-300 mb-1">รหัส (ภายใน):</label>
+                <input type="text" id="internalCode" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="รหัสอ้างอิงภายใน">
+            </div>
+            <div>
+                <label for="pk2Number" class="block text-sm font-medium text-slate-300 mb-1">เลขที่ พค.2:</label>
+                <input type="text" id="pk2Number" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="เลขที่เอกสาร พค.2">
+            </div>
+        </div>
+
+        <div class="mb-4 sm:mb-6">
+            <label class="block text-sm font-medium text-slate-300 mb-1">ประเภทการขอ:</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 checkbox-group mt-2">
+                <div>
+                    <input type="checkbox" id="typeNew" name="registrationType" value="รายใหม่" class="form-checkbox h-5 w-5 text-sky-500 bg-slate-700 border-slate-600 rounded focus:ring-sky-500">
+                    <label for="typeNew" class="text-slate-300">รายใหม่</label>
+                </div>
+                <div>
+                    <input type="checkbox" id="typeRenew" name="registrationType" value="ต่ออายุ" class="form-checkbox h-5 w-5 text-sky-500 bg-slate-700 border-slate-600 rounded focus:ring-sky-500">
+                    <label for="typeRenew" class="text-slate-300">ต่ออายุ</label>
+                </div>
+                <div>
+                    <input type="checkbox" id="typeExpand" name="registrationType" value="ขยาย" class="form-checkbox h-5 w-5 text-sky-500 bg-slate-700 border-slate-600 rounded focus:ring-sky-500">
+                    <label for="typeExpand" class="text-slate-300">ขยาย</label>
+                </div>
+                <div>
+                    <input type="checkbox" id="typeChange" name="registrationType" value="เปลี่ยนแปลงข้อมูล" class="form-checkbox h-5 w-5 text-sky-500 bg-slate-700 border-slate-600 rounded focus:ring-sky-500">
+                    <label for="typeChange" class="text-slate-300">เปลี่ยนแปลงข้อมูล</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-4 sm:mb-6">
+            <label for="businessName" class="block text-sm font-medium text-slate-300 mb-1">ชื่อกิจการ:</label>
+            <textarea id="businessName" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="ชื่อสถานประกอบการ/กิจการ"></textarea>
+        </div>
+
+        <div class="mb-4 sm:mb-6">
+            <label for="location" class="block text-sm font-medium text-slate-300 mb-1">สถานที่ตั้ง:</label>
+            <textarea id="location" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400" placeholder="รายละเอียดที่ตั้ง"></textarea>
+        </div>
+
+
+        <div class="mb-6">
+            <label for="numMachines" class="block text-sm font-medium text-slate-300 mb-1">จำนวนเครื่องที่ต้องการออกเลขทะเบียน:</label>
+            <input type="number" id="numMachines" min="1" value="1" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400">
+        </div>
+
+        <button id="generateButton" class="w-full bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-600 hover:to-cyan-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-150 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+            ตั้งค่า URL ของ Apps Script ก่อน
+        </button>
+
+        <div id="loadingIndicator" class="spinner" style="display: none;"></div>
+
+        <div id="resultsArea" class="mt-6 sm:mt-8" style="display: none;">
+            <h2 class="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-sky-400">เลขทะเบียนที่ออกได้:</h2>
+            <div id="registrationNumbersListContainer" class="bg-slate-700 p-4 rounded-lg">
+                <ul id="registrationNumbersList" class="list-none space-y-2 text-slate-200"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="modalCloseButton">&times;</span>
+            <p id="modalMessageText" class="text-lg mt-2 mb-4"></p>
+            <button id="modalOkButton" class="bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg">ตกลง</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Configuration ---
+        const APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxCw9h38hxguZ6RiBafiVUYapUDy8-13by0mF-H7nhzAUAoCJWwRKCCgPe5Iwf7cG78/exec"; 
+
+        const provinceSelect = document.getElementById('province');
+        const tsicIdInput = document.getElementById('tsicId');
+        const numMachinesInput = document.getElementById('numMachines');
+        const generateButton = document.getElementById('generateButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsArea = document.getElementById('resultsArea');
+        const registrationNumbersList = document.getElementById('registrationNumbersList');
+
+        // New form elements
+        const proposerInput = document.getElementById('proposer');
+        const departmentSelect = document.getElementById('department');
+        const businessNameInput = document.getElementById('businessName'); // Changed to textarea
+        const internalCodeInput = document.getElementById('internalCode');
+        const locationInput = document.getElementById('location'); // Changed to textarea
+        const pk2NumberInput = document.getElementById('pk2Number');
+        const registrationTypeCheckboxes = document.querySelectorAll('input[name="registrationType"]');
+
+
+        const messageModal = document.getElementById('messageModal');
+        const modalMessageText = document.getElementById('modalMessageText');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+        const modalOkButton = document.getElementById('modalOkButton');
+
+        function showModal(message) {
+            modalMessageText.textContent = message;
+            messageModal.style.display = 'flex';
+        }
+        modalCloseButton.onclick = closeModal;
+        modalOkButton.onclick = closeModal;
+        window.onclick = function(event) { if (event.target == messageModal) closeModal(); }
+        function closeModal() { messageModal.style.display = 'none'; }
+
+        function checkAndEnableForm() { 
+            if (APPS_SCRIPT_WEB_APP_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE" || APPS_SCRIPT_WEB_APP_URL === "" || !APPS_SCRIPT_WEB_APP_URL) {
+                 generateButton.disabled = true;
+                 generateButton.textContent = 'ตั้งค่า URL ของ Apps Script ก่อน';
+                 return;
+            }
+            generateButton.disabled = false;
+            generateButton.textContent = 'ออกเลขทะเบียน';
+        }
+        
+        checkAndEnableForm();
+
+        async function populateProvinces() {
+            while (provinceSelect.options.length > 1) provinceSelect.remove(1);
+            const loadingOption = document.createElement('option');
+            loadingOption.textContent = 'กำลังโหลดข้อมูลจังหวัด...';
+            loadingOption.disabled = true; loadingOption.value = "";
+            provinceSelect.appendChild(loadingOption);
+
+            const provinceDataSourceUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTdG6rfDiJAKOH-reAkapQFs_8awuhp2Clb-9plQaaYd8RRmzN6bO4QC5663lrNHhxZrGUDNDAbab86/pub?output=csv'; 
+
+            try {
+                const response = await fetch(provinceDataSourceUrl);
+                if (!response.ok) throw new Error(`โหลดข้อมูลจังหวัดล้มเหลว: ${response.statusText} (สถานะ: ${response.status})`);
+                
+                const csvText = await response.text();
+                provinceSelect.removeChild(loadingOption);
+
+                const rows = csvText.split('\n').map(row => row.trim()).filter(row => row); 
+                
+                if (rows.length <= 1) {
+                    showModal('ไม่พบข้อมูลจังหวัดใน Google Sheet หรือไฟล์ CSV ว่างเปล่า (หลังจากตัดหัวตาราง ถ้ามี)');
+                    console.warn('No data rows found in CSV from Google Sheet.');
+                    return;
+                }
+
+                const dataRows = rows.slice(1); 
+
+                dataRows.forEach(row => {
+                    const columns = row.split(','); 
+                    if (columns.length >= 2) {
+                        const provinceName = columns[0].trim().replace(/"/g, '');
+                        const provinceCode = columns[1].trim().replace(/"/g, '');
+
+                        if (provinceName && provinceCode) {
+                            const option = document.createElement('option');
+                            option.value = provinceCode;
+                            option.textContent = `${provinceName} (${provinceCode})`;
+                            provinceSelect.appendChild(option);
+                        }
+                    }
+                });
+
+                if (provinceSelect.options.length <= 1) {
+                     showModal('ไม่สามารถประมวลผลข้อมูลจังหวัดจาก Google Sheet ได้ หรือข้อมูลไม่ถูกต้อง');
+                }
+
+            } catch (error) {
+                console.error('Failed to load or parse provinces from CSV:', error);
+                showModal(`เกิดข้อผิดพลาดในการโหลดหรือประมวลผลข้อมูลจังหวัด: ${error.message}`);
+                if (provinceSelect.contains(loadingOption)) provinceSelect.removeChild(loadingOption);
+                const errorOption = document.createElement('option');
+                errorOption.textContent = 'โหลดข้อมูลจังหวัดล้มเหลว'; errorOption.disabled = true;
+                provinceSelect.appendChild(errorOption);
+            }
+        }
+        populateProvinces();
+
+        generateButton.addEventListener('click', async () => {
+            if (APPS_SCRIPT_WEB_APP_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE" || APPS_SCRIPT_WEB_APP_URL === "" || !APPS_SCRIPT_WEB_APP_URL) {
+                showModal("ข้อผิดพลาด: กรุณาตั้งค่า URL ของ Google Apps Script ในโค้ด (ตัวแปร APPS_SCRIPT_WEB_APP_URL) ก่อน");
+                return;
+            }
+
+            const selectedProvinceCode = provinceSelect.value;
+            const tsicId = tsicIdInput.value.trim();
+            const numMachines = parseInt(numMachinesInput.value, 10);
+
+            // Get values from new fields
+            const proposer = proposerInput.value.trim();
+            const department = departmentSelect.value;
+            const businessName = businessNameInput.value.trim();
+            const internalCode = internalCodeInput.value.trim();
+            const location = locationInput.value.trim();
+            const pk2Number = pk2NumberInput.value.trim();
+            
+            const selectedRegistrationTypes = [];
+            registrationTypeCheckboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selectedRegistrationTypes.push(checkbox.value);
+                }
+            });
+            const registrationTypeString = selectedRegistrationTypes.join(', '); // Join as comma-separated string
+
+            // Basic validation for some new fields (optional, add more as needed)
+            if (!proposer) { showModal("กรุณากรอกชื่อผู้เสนอ"); proposerInput.focus(); return; }
+            if (!department) { showModal("กรุณาเลือกงาน"); departmentSelect.focus(); return; }
+            if (!businessName) { showModal("กรุณากรอกชื่อกิจการ"); businessNameInput.focus(); return; }
+            if (selectedRegistrationTypes.length === 0) { showModal("กรุณาเลือกประเภทการขออย่างน้อย 1 รายการ"); return;}
+
+
+            if (!selectedProvinceCode) { showModal("กรุณาเลือกจังหวัด (สำหรับออกเลข)"); return; }
+            if (!/^\d{3}$/.test(tsicId)) { showModal("กรุณากรอกรหัส TSIC ID เป็นตัวเลข 3 หลัก"); tsicIdInput.focus(); return; }
+            if (isNaN(numMachines) || numMachines < 1) { showModal("กรุณากรอกจำนวนเครื่องที่ต้องการเป็นตัวเลขที่มากกว่า 0"); numMachinesInput.focus(); return; }
+
+            loadingIndicator.style.display = 'block';
+            resultsArea.style.display = 'none';
+            registrationNumbersList.innerHTML = '';
+            generateButton.disabled = true;
+            generateButton.textContent = 'กำลังสร้างเลขทะเบียน...';
+
+            const requestPayload = {
+                action: "generateRegistration",
+                provinceCode: selectedProvinceCode,
+                tsicId: tsicId,
+                numMachines: numMachines,
+                // Add new fields to payload
+                proposer: proposer,
+                department: department,
+                registrationTypes: registrationTypeString, // Send as string
+                businessName: businessName,
+                internalCode: internalCode,
+                location: location,
+                pk2Number: pk2Number
+            };
+
+            console.log("Attempting to POST to Apps Script URL:", APPS_SCRIPT_WEB_APP_URL);
+            console.log("Payload:", JSON.stringify(requestPayload));
+
+            try {
+                const response = await fetch(APPS_SCRIPT_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'cors', 
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'text/plain', 
+                    },
+                    body: JSON.stringify(requestPayload) 
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success && result.generatedNumbers) {
+                    registrationNumbersList.innerHTML = result.generatedNumbers.map(num => `<li class="p-2 bg-slate-600 rounded">${num}</li>`).join('');
+                    resultsArea.style.display = 'block';
+                } else {
+                    if (!response.ok || (result && !result.success)) {
+                        console.error("Error response from Apps Script:", result);
+                    }
+                    throw new Error(result.error || `เกิดข้อผิดพลาดจาก Apps Script (สถานะ: ${response.status})`);
+                }
+
+            } catch (error) {
+                console.error("Error caught during fetch to Apps Script:", error);
+                console.error("Error name:", error.name);
+                console.error("Error message:", error.message);
+                showModal(`เกิดข้อผิดพลาดในการสร้างเลขทะเบียน: ${error.message} (ดู Console สำหรับรายละเอียดเพิ่มเติม)`);
+            } finally {
+                loadingIndicator.style.display = 'none';
+                checkAndEnableForm(); 
+            }
+        });
+    </script>
+</body>
+</html>
